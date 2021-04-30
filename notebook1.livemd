@@ -1,0 +1,75 @@
+# Christian's first LiveBook test
+
+- https://www.youtube.com/watch?v=RKvqc-UEe34
+
+
+```bicep
+```
+
+## How to start
+
+Run this from Windows by calling
+
+```cmd
+docker run -p 8080:8080 --env MIX_INSTALL_DIR=/mixcache -v C:/github/chgeuer/mixcache:/mixcache -v C:/github/chgeuer/livebook:/data livebook/livebook
+docker run -p 8080:8080 --env MIX_INSTALL_DIR=/mixcache --env LIVEBOOK_IP=0.0.0.0 --env LIVEBOOK_PASSWORD=Secret123gyJFgny8 --env LIVEBOOK_PORT=8080 -v C:/github/chgeuer/mixcache:/mixcache -v C:/github/chgeuer/livebook:/data livebook/livebook
+```
+apt add --no-cache make
+RUN apk update && apk add --virtual build-dependencies build-base gcc wget git
+
+## Install dependencies
+
+```elixir
+Mix.install([
+  {:exla, "~> 0.1.0-dev", github: "elixir-nx/nx", sparse: "exla", override: true},
+  {:nx, "~> 0.1.0-dev", github: "elixir-nx/nx", sparse: "nx", override: true},
+  {:axon, "~> 0.1.0-dev", github: "elixir-nx/axon"}
+])
+```
+
+### Download training data and unpack
+
+```elixir
+{:ok, { _status, _headers, train_body_gz } } = 
+    :httpc.request("https://storage.googleapis.com/cvdf-datasets/mnist/train-images-idx3-ubyte.gz")
+
+<<_::32, n_images::32, n_rows::32, n_cols::32, train_body::binary>> = 
+   :zlib.gunzip(train_body_gz)
+```
+
+### Quickly visualize the bits
+
+```elixir
+train_tensor =
+  train_body
+  |> Nx.from_binary({:u, 8})
+  |> Nx.reshape({n_images, n_rows, n_cols})
+  |> Nx.divide(255)
+
+Nx.to_heatmap(train_tensor)
+```
+
+### Download the labels
+
+```elixir
+{:ok, { _status, _headers, labels_body_gz } } = 
+    :httpc.request("https://storage.googleapis.com/cvdf-datasets/mnist/train-labels-idx1-ubyte.gz")
+
+<<_::32, n_labels::32, label_body::binary>> = 
+   :zlib.gunzip(labels_body_gz)
+
+label_body
+|> Nx.from_binary({:u, 8})     # [5,0,4,1,...]
+|> Nx.reshape({n_labels, 1})   # [[5],[0],[4],[1],...]
+|> Nx.equal(Nx.tensor(Enum.to_list(0..9))) # [0,0,0,0,0,1,0,0,0,0], [1,0,0,0,0,0,0,0,0,0], [0,0,0,0,1,0,0,0,0,0], ...
+```
+
+```elixir
+require Axon
+
+model =
+   Axon.input({nil, 28, 28})
+   |> Axon.flatten()
+   |> Axon.dense(128, activation: :sigmoid)
+   |> Axon.dense(10, activation: :softmax)
+```
